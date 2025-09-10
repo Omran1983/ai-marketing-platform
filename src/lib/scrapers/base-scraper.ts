@@ -2,6 +2,19 @@ import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { createHash } from 'crypto'
 
+// Utility function to check if an object is empty
+const isEmptyObject = (obj: any): boolean => {
+  if (!obj || typeof obj !== 'object') return false
+  return Object.keys(obj).length === 0
+}
+
+// Utility function to check if error message is meaningful
+const isMeaningfulError = (message: string): boolean => {
+  if (!message) return false
+  const meaninglessMessages = ['{}', '""', '[object Object]', 'Network Error']
+  return !meaninglessMessages.includes(message) && message.trim().length > 0
+}
+
 // Common user agents for scraping
 const USER_AGENTS = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -75,10 +88,37 @@ export abstract class BaseScraper {
         return cheerio.load(response.data)
       } catch (error: any) {
         attempt++
-        console.error(`Scraping attempt ${attempt} failed for ${url}:`, error.message)
+        
+        // More robust error logging to prevent "API Error: {}" messages
+        let errorMessage = 'Unknown error'
+        
+        // Extract meaningful error information
+        if (error.response?.data) {
+          if (typeof error.response.data === 'string') {
+            errorMessage = error.response.data
+          } else if (typeof error.response.data === 'object' && !isEmptyObject(error.response.data)) {
+            // Check if it's a structured error response
+            if (error.response.data.error) {
+              errorMessage = error.response.data.error
+            } else {
+              // Convert object to string but only if it contains meaningful data
+              const dataStr = JSON.stringify(error.response.data)
+              if (isMeaningfulError(dataStr)) {
+                errorMessage = dataStr
+              }
+            }
+          }
+        } else if (error.message) {
+          errorMessage = error.message
+        }
+        
+        // Only log meaningful errors
+        if (isMeaningfulError(errorMessage)) {
+          console.error(`Scraping attempt ${attempt} failed for ${url}:`, errorMessage)
+        }
         
         if (attempt >= (this.config.retries || 3)) {
-          throw new Error(`Failed to fetch ${url} after ${attempt} attempts: ${error.message}`)
+          throw new Error(`Failed to fetch ${url} after ${attempt} attempts: ${errorMessage}`)
         }
       }
     }

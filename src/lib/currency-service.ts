@@ -3,6 +3,19 @@ import axios from 'axios'
 const EXCHANGE_API_BASE = 'https://v6.exchangerate-api.com/v6'
 const EXCHANGE_API_KEY = process.env.EXCHANGE_RATE_API_KEY
 
+// Utility function to check if an object is empty
+const isEmptyObject = (obj: any): boolean => {
+  if (!obj || typeof obj !== 'object') return false
+  return Object.keys(obj).length === 0
+}
+
+// Utility function to check if error message is meaningful
+const isMeaningfulError = (message: string): boolean => {
+  if (!message) return false
+  const meaninglessMessages = ['{}', '""', '[object Object]', 'Network Error']
+  return !meaninglessMessages.includes(message) && message.trim().length > 0
+}
+
 interface ExchangeRates {
   [currency: string]: number
 }
@@ -60,8 +73,43 @@ export class CurrencyService {
         throw new Error(response.data['error-type'] || 'Unknown API error')
       }
     } catch (error: any) {
-      console.error('Exchange Rate API Error:', error.response?.data || error.message)
-      throw new Error(`Currency API Error: ${error.response?.data?.message || error.message}`)
+      // More robust error logging to prevent "API Error: {}" messages
+      let errorMessage = 'Unknown error'
+      let errorData = null
+      
+      // Extract meaningful error information
+      if (error.response?.data) {
+        if (typeof error.response.data === 'string') {
+          errorMessage = error.response.data
+        } else if (typeof error.response.data === 'object' && !isEmptyObject(error.response.data)) {
+          // Check if it's a structured error response
+          if (error.response.data.error) {
+            errorMessage = error.response.data.error
+          } else if (error.response.data['error-type']) {
+            errorMessage = error.response.data['error-type']
+          } else {
+            // Convert object to string but only if it contains meaningful data
+            const dataStr = JSON.stringify(error.response.data)
+            if (isMeaningfulError(dataStr)) {
+              errorMessage = dataStr
+            }
+          }
+          errorData = error.response.data
+        }
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
+      // Only log meaningful errors
+      if (isMeaningfulError(errorMessage) || errorData) {
+        console.error('Exchange Rate API Error:', {
+          message: errorMessage,
+          status: error.response?.status,
+          data: errorData
+        })
+      }
+      
+      throw new Error(`Currency API Error: ${errorMessage}`)
     }
   }
 
