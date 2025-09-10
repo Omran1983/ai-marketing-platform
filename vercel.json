@@ -19,10 +19,6 @@
     {
       "path": "/api/scraper/run-daily",
       "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/budget/monitor",
-      "schedule": "0 2 * * *"
     }
   ]
 }
