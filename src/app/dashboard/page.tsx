@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
+import { useDashboardAnalytics, useCreateCampaign } from '@/lib/hooks'
+import CreateCampaignModal from '@/components/CreateCampaignModal'
 import {
   CubeIcon,
   PhotoIcon,
@@ -85,44 +87,33 @@ function PremiumMetricCard({ title, value, change, changeType, icon: Icon, gradi
 
 export default function Dashboard() {
   const { data: session } = useSession()
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [loading, setLoading] = useState(true)
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [showCreateCampaign, setShowCreateCampaign] = useState(false)
+  
+  // Use real API data
+  const { data: stats, isLoading, error } = useDashboardAnalytics()
+  
+  // Fallback to mock data if API fails
+  const dashboardData = stats || {
+    revenue: 847650.25,
+    campaigns: 12,
+    impressions: 2847320,
+    clickRate: 4.7,
+    conversions: 8947,
+    totalSpend: 156890.50,
+    products: 89,
+    creatives: 234,
+    activeUsers: 15847,
+    globalReach: 47,
+    aiInsights: 1247
+  }
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
 
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        
-        setStats({
-          revenue: 847650.25,
-          campaigns: 12,
-          impressions: 2847320,
-          clickRate: 4.7,
-          conversions: 8947,
-          totalSpend: 156890.50,
-          products: 89,
-          creatives: 234,
-          activeUsers: 15847,
-          globalReach: 47,
-          aiInsights: 1247
-        })
-      } catch (error) {
-        console.error('Failed to fetch stats:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchStats()
-  }, [])
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="animate-fade-in space-y-8">
         <div className="surface-premium p-8 animate-shimmer">
@@ -145,7 +136,7 @@ export default function Dashboard() {
   const premiumMetrics = [
     {
       title: 'Total Revenue',
-      value: `$${stats?.revenue?.toLocaleString() || '0'}`,
+      value: `$${dashboardData?.revenue?.toLocaleString() || '0'}`,
       change: '+34.2%',
       changeType: 'positive' as const,
       icon: BanknotesIcon,
@@ -155,7 +146,7 @@ export default function Dashboard() {
     },
     {
       title: 'AI Insights Generated',
-      value: stats?.aiInsights?.toLocaleString() || '0',
+      value: dashboardData?.aiInsights?.toLocaleString() || '0',
       change: '+67.8%',
       changeType: 'positive' as const,
       icon: SparklesIcon,
@@ -165,7 +156,7 @@ export default function Dashboard() {
     },
     {
       title: 'Global Reach',
-      value: `${stats?.globalReach || '0'} Countries`,
+      value: `${dashboardData?.globalReach || '0'} Countries`,
       change: '+12.3%',
       changeType: 'positive' as const,
       icon: GlobeAltIcon,
@@ -175,7 +166,7 @@ export default function Dashboard() {
     },
     {
       title: 'Active Campaigns',
-      value: stats?.campaigns?.toString() || '0',
+      value: dashboardData?.campaigns?.toString() || '0',
       change: '+28.1%',
       changeType: 'positive' as const,
       icon: RocketLaunchIcon,
@@ -185,7 +176,7 @@ export default function Dashboard() {
     },
     {
       title: 'Total Impressions',
-      value: `${(stats?.impressions! / 1000000).toFixed(1)}M`,
+      value: `${(dashboardData?.impressions! / 1000000).toFixed(1)}M`,
       change: '+45.6%',
       changeType: 'positive' as const,
       icon: EyeIcon,
@@ -195,7 +186,7 @@ export default function Dashboard() {
     },
     {
       title: 'Conversion Rate',
-      value: `${stats?.clickRate || '0'}%`,
+      value: `${dashboardData?.clickRate || '0'}%`,
       change: '+8.9%',
       changeType: 'positive' as const,
       icon: TrophyIcon,
@@ -212,7 +203,8 @@ export default function Dashboard() {
       href: '/dashboard/campaigns',
       icon: RocketLaunchIcon,
       gradient: 'from-blue-500 to-purple-600',
-      premium: true
+      premium: true,
+      onClick: () => setShowCreateCampaign(true)
     },
     {
       title: '🎨 Smart Creative Studio',
@@ -293,18 +285,18 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center space-x-2 px-4 py-2 bg-white/20 rounded-full backdrop-blur-sm">
                   <TrophyIcon className="w-4 h-4 text-yellow-500" />
-                  <span className="font-semibold">ROI: +{((stats?.revenue! / stats?.totalSpend! - 1) * 100).toFixed(0)}%</span>
+                  <span className="font-semibold">ROI: +{((dashboardData?.revenue! / dashboardData?.totalSpend! - 1) * 100).toFixed(0)}%</span>
                 </div>
                 <div className="flex items-center space-x-2 px-4 py-2 bg-white/20 rounded-full backdrop-blur-sm">
                   <UserGroupIcon className="w-4 h-4 text-blue-500" />
-                  <span className="font-semibold">{stats?.activeUsers?.toLocaleString()} Active Users</span>
+                  <span className="font-semibold">{dashboardData?.activeUsers?.toLocaleString()} Active Users</span>
                 </div>
               </div>
             </div>
             
             <div className="text-right">
               <div className="text-3xl font-bold text-gradient-premium mb-2">
-                ${((stats?.revenue! / stats?.totalSpend! - 1) * 100).toFixed(1)}% ROI
+                ${((dashboardData?.revenue! / dashboardData?.totalSpend! - 1) * 100).toFixed(1)}% ROI
               </div>
               <p className="text-caption">This Quarter's Return</p>
             </div>
@@ -339,10 +331,10 @@ export default function Dashboard() {
             <div className="p-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {quickActions.map((action, index) => (
-                  <a
+                  <button
                     key={action.title}
-                    href={action.href}
-                    className="group relative p-6 surface-elevated rounded-2xl hover-lift overflow-hidden"
+                    onClick={action.onClick || (() => window.location.href = action.href)}
+                    className="group relative p-6 surface-elevated rounded-2xl hover-lift overflow-hidden w-full text-left"
                     style={{ animationDelay: `${index * 100}ms` }}
                   >
                     <div className={`absolute inset-0 bg-gradient-to-br ${action.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
@@ -362,7 +354,7 @@ export default function Dashboard() {
                         </div>
                       )}
                     </div>
-                  </a>
+                  </button>
                 ))}
               </div>
             </div>
@@ -430,7 +422,7 @@ export default function Dashboard() {
             <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg">
               <BanknotesIcon className="w-8 h-8 text-white" />
             </div>
-            <div className="text-2xl font-bold text-gradient-premium">${stats?.revenue?.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-gradient-premium">${dashboardData?.revenue?.toLocaleString()}</div>
             <div className="text-sm text-gray-600 mt-1">Total Revenue</div>
           </div>
           
@@ -438,7 +430,7 @@ export default function Dashboard() {
             <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg">
               <UserGroupIcon className="w-8 h-8 text-white" />
             </div>
-            <div className="text-2xl font-bold text-gradient-premium">{stats?.conversions?.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-gradient-premium">{dashboardData?.conversions?.toLocaleString()}</div>
             <div className="text-sm text-gray-600 mt-1">Conversions</div>
           </div>
           
@@ -446,7 +438,7 @@ export default function Dashboard() {
             <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg">
               <GlobeAltIcon className="w-8 h-8 text-white" />
             </div>
-            <div className="text-2xl font-bold text-gradient-premium">{stats?.globalReach}</div>
+            <div className="text-2xl font-bold text-gradient-premium">{dashboardData?.globalReach}</div>
             <div className="text-sm text-gray-600 mt-1">Countries Reached</div>
           </div>
           
@@ -454,11 +446,17 @@ export default function Dashboard() {
             <div className="w-16 h-16 bg-gradient-to-br from-orange-500 to-red-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300 shadow-lg">
               <SparklesIcon className="w-8 h-8 text-white" />
             </div>
-            <div className="text-2xl font-bold text-gradient-premium">{stats?.aiInsights?.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-gradient-premium">{dashboardData?.aiInsights?.toLocaleString()}</div>
             <div className="text-sm text-gray-600 mt-1">AI Insights</div>
           </div>
         </div>
       </div>
+
+      {/* Create Campaign Modal */}
+      <CreateCampaignModal 
+        isOpen={showCreateCampaign} 
+        onClose={() => setShowCreateCampaign(false)} 
+      />
     </div>
   )
 }

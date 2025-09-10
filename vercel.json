@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "build": {
+    "env": {
+      "NEXT_PUBLIC_PROVIDER": "mock"
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/analytics/sync",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/scraper/run-daily",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/budget/monitor",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}

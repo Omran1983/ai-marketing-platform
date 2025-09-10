@@ -292,6 +292,59 @@ export DATABASE_URL="your-production-db-url"
 npm start
 ```
 
+## 🚀 Quick Deployment Setup
+
+To get your AI Marketing Platform deployed quickly:
+
+1. **Install dependencies**:
+   ```bash
+   npm install
+   ```
+
+2. **Configure environment**:
+   ```bash
+   # Copy the example environment file
+   cp .env .env.local
+   
+   # Edit .env.local with your actual configuration
+   # See comments in the file for detailed instructions
+   ```
+
+3. **Set up database**:
+   ```bash
+   # Generate Prisma client
+   npm run generate
+   
+   # Push database schema
+   npm run db:push
+   
+   # Seed with demo data
+   npm run db:seed
+   ```
+
+4. **Start development server**:
+   ```bash
+   npm run dev
+   ```
+
+5. **For production deployment**:
+   - Follow the detailed instructions in [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md)
+   - Set all required environment variables
+   - Use a production database (Neon.tech recommended)
+   - Configure Redis for queue processing (Upstash recommended)
+
+## ⚡ Ultra-Fast Deployment
+
+Want to get started in 15 minutes or less? Follow our [QUICK_DEPLOY.md](QUICK_DEPLOY.md) guide:
+
+1. **Use free tiers** (Neon.tech for database, Upstash for Redis)
+2. **Generate secrets** with our built-in tool: `npm run generate:secrets`
+3. **Configure environment** with placeholder values
+4. **Run automated setup**: `npm run setup`
+5. **Deploy to Vercel** with one click
+
+**No credit cards required** - everything can be deployed using free tiers!
+
 ## 🤝 Contributing
 
 1. Fork the repository

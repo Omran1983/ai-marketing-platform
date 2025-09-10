@@ -99,10 +99,20 @@ export async function GET(request: NextRequest) {
     ])
 
     // Parse content JSON for each creative
-    const creativesWithParsedContent = creatives.map(creative => ({
-      ...creative,
-      content: JSON.parse(creative.content)
-    }))
+    const creativesWithParsedContent = creatives.map(creative => {
+      let content = {};
+      try {
+        content = JSON.parse(creative.content);
+      } catch (parseError) {
+        // If parsing fails, use the content as-is or provide a default
+        content = typeof creative.content === 'string' ? { text: creative.content } : {};
+      }
+      
+      return {
+        ...creative,
+        content
+      };
+    });
 
     return apiResponse({
       creatives: creativesWithParsedContent,
@@ -112,7 +122,7 @@ export async function GET(request: NextRequest) {
         total,
         pages: Math.ceil(total / limit)
       }
-    })
+    });
   } catch (error: any) {
     return apiError(error.message, error.message === 'Unauthorized' ? 401 : 500)
   }

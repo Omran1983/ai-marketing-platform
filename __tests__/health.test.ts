@@ -15,6 +15,9 @@ describe('/api/health', () => {
     const data = await response.json();
 
     expect(response.status).toBe(200);
-    expect(data).toEqual({ ok: true });
+    expect(data.ok).toBe(true);
+    expect(data.database).toBe('connected');
+    expect(data.stats).toBeDefined();
+    expect(data.timestamp).toBeDefined();
   });
 });

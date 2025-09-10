@@ -32,9 +32,9 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50">
       <Sidebar />
-      <div className="lg:pl-64">
+      <div className="lg:pl-80">
         <Header />
         <main className="section-padding">
           <div className="container-app">

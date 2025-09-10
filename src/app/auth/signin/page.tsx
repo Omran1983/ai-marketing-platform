@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { signIn, getSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { EyeIcon, EyeSlashIcon, UserIcon, LockClosedIcon } from '@heroicons/react/24/outline'
 
@@ -13,6 +13,8 @@ export default function SignIn() {
   const [loading, setLoading] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,7 +31,9 @@ export default function SignIn() {
       if (result?.error) {
         setError('Invalid credentials - please check your email and password')
       } else {
-        router.push('/dashboard')
+        // Redirect to the callback URL or dashboard
+        router.push(callbackUrl)
+        router.refresh()
       }
     } catch (error) {
       setError('Something went wrong. Please try again!')

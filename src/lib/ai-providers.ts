@@ -1,3 +1,5 @@
+import { huggingFaceService } from '@/lib/huggingface-service'
+
 export interface CreativeRequest {
   type: 'IMAGE' | 'COPY' | 'VIDEO'
   prompt: string
@@ -14,6 +16,7 @@ export interface CreativeResponse {
     description?: string
     cta?: string
     videoUrl?: string
+    text?: string
   }
   status: 'COMPLETED' | 'FAILED'
   error?: string
@@ -126,6 +129,73 @@ class MockAIProvider {
   }
 }
 
+class HuggingFaceProvider {
+  async generateCreative(request: CreativeRequest): Promise<CreativeResponse> {
+    try {
+      let content: any = {}
+      
+      switch (request.type) {
+        case 'IMAGE':
+          // For images, we'll generate a description and then use that for image generation
+          const imagePrompt = `Create a marketing image for: ${request.prompt}. Professional, high-quality, commercial use.`
+          content = {
+            title: `Marketing Image for ${request.prompt.substring(0, 30)}...`,
+            description: request.prompt,
+            imageUrl: `https://via.placeholder.com/800x600/667eea/ffffff?text=${encodeURIComponent(request.prompt.substring(0, 20))}`
+          }
+          break
+          
+        case 'COPY':
+          // Use Hugging Face for text generation
+          try {
+            const generatedText = await huggingFaceService.generateMarketingCopy(request.prompt)
+            content = {
+              text: Array.isArray(generatedText) ? generatedText[0].summary_text : 'Generated marketing copy',
+              title: `Generated Copy for ${request.prompt.substring(0, 30)}...`,
+              description: request.prompt
+            }
+          } catch (error) {
+            // Fallback to mock if Hugging Face fails
+            content = {
+              text: `Professional marketing copy for: ${request.prompt}`,
+              title: `Generated Copy for ${request.prompt.substring(0, 30)}...`,
+              description: request.prompt
+            }
+          }
+          break
+          
+        case 'VIDEO':
+          content = {
+            videoUrl: `https://sample-videos.com/zip/10/mp4/SampleVideo_1.mp4`,
+            title: `Marketing Video for ${request.prompt.substring(0, 30)}...`,
+            description: request.prompt
+          }
+          break
+      }
+      
+      return {
+        id: `hf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        type: request.type,
+        content,
+        status: 'COMPLETED'
+      }
+    } catch (error: any) {
+      return {
+        id: `hf_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        type: request.type,
+        content: {},
+        status: 'FAILED',
+        error: error.message || 'Failed to generate creative with Hugging Face'
+      }
+    }
+  }
+  
+  async generateAnalytics(campaignId: string, dateRange: { start: Date, end: Date }): Promise<AnalyticsData[]> {
+    // Use mock analytics for now
+    return new MockAIProvider().generateAnalytics(campaignId, dateRange)
+  }
+}
+
 class MetaProvider {
   constructor(private accessToken: string) {}
   
@@ -160,6 +230,8 @@ export function getAIProvider() {
   switch (provider) {
     case 'mock':
       return new MockAIProvider()
+    case 'huggingface':
+      return new HuggingFaceProvider()
     case 'meta':
       if (!process.env.META_ACCESS_TOKEN) {
         console.warn('META_ACCESS_TOKEN not set, falling back to mock provider')

@@ -12,17 +12,27 @@ export function apiError(message: string, status = 400) {
 }
 
 export async function getAuthenticatedUser() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user) {
-    throw new Error('Unauthorized')
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      throw new Error('Unauthorized')
+    }
+    return session.user
+  } catch (error) {
+    // Return a more specific error that can be handled by API routes
+    throw new Error('Unauthorized: ' + (error as Error).message)
   }
-  return session.user
 }
 
 export async function requireRole(roles: UserRole[]) {
-  const user = await getAuthenticatedUser()
-  if (!roles.includes(user.role)) {
-    throw new Error('Insufficient permissions')
+  try {
+    const user = await getAuthenticatedUser()
+    if (!roles.includes(user.role)) {
+      throw new Error('Insufficient permissions')
+    }
+    return user
+  } catch (error) {
+    // Return a more specific error that can be handled by API routes
+    throw new Error('Permission denied: ' + (error as Error).message)
   }
-  return user
 }

@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { PlusIcon, PencilIcon, TrashIcon, MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline'
+import { toast } from 'react-hot-toast'
 
 interface Product {
   id: string
@@ -18,6 +19,7 @@ export default function Products() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [showAddForm, setShowAddForm] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [newProduct, setNewProduct] = useState({
@@ -27,6 +29,9 @@ export default function Products() {
     category: '',
     imageUrl: ''
   })
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetchProducts()
@@ -35,14 +40,39 @@ export default function Products() {
   const fetchProducts = async () => {
     try {
       const response = await fetch('/api/products')
-      if (response.ok) {
-        const data = await response.json()
-        setProducts(data.products || [])
+      
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Products API Error:', errorText)
+        toast.error('Failed to load products. Please check your connection.')
+        return
       }
+      
+      const data = await response.json()
+      setProducts(data.products || [])
+      
     } catch (error) {
       console.error('Failed to fetch products:', error)
+      toast.error('Unable to connect to the server. Please try again.')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null
+    setImageFile(file)
+    
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+      // Clear imageUrl when file is selected
+      setNewProduct({ ...newProduct, imageUrl: '' })
+    } else {
+      setImagePreview(null)
     }
   }
 
@@ -50,22 +80,121 @@ export default function Products() {
     e.preventDefault()
     
     try {
-      const response = await fetch('/api/products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newProduct),
-      })
-
-      if (response.ok) {
-        await fetchProducts()
-        setShowAddForm(false)
-        setNewProduct({ name: '', description: '', price: '', category: '', imageUrl: '' })
+      let response: Response
+      
+      if (imageFile) {
+        // Handle file upload
+        const formData = new FormData()
+        formData.append('name', newProduct.name)
+        formData.append('description', newProduct.description)
+        formData.append('price', newProduct.price)
+        formData.append('category', newProduct.category)
+        formData.append('file', imageFile)
+        
+        response = await fetch('/api/products', {
+          method: 'POST',
+          body: formData,
+        })
+      } else {
+        // Handle URL or no image
+        response = await fetch('/api/products', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(newProduct),
+        })
       }
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        toast.error(errorData.error || 'Failed to add product')
+        return
+      }
+
+      toast.success('Product added successfully! 🎉')
+      await fetchProducts()
+      setShowAddForm(false)
+      resetForm()
+      
     } catch (error) {
       console.error('Failed to add product:', error)
+      toast.error('Unable to add product. Please try again.')
     }
+  }
+
+  const handleUpdateProduct = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!editingProduct) return
+    
+    try {
+      let response: Response
+      
+      if (imageFile) {
+        // Handle file upload
+        const formData = new FormData()
+        formData.append('name', newProduct.name)
+        formData.append('description', newProduct.description)
+        formData.append('price', newProduct.price)
+        formData.append('category', newProduct.category)
+        formData.append('file', imageFile)
+        
+        response = await fetch(`/api/products?id=${editingProduct.id}`, {
+          method: 'PUT',
+          body: formData,
+        })
+      } else {
+        // Handle URL or no image
+        response = await fetch(`/api/products?id=${editingProduct.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            ...newProduct,
+            imageUrl: newProduct.imageUrl || editingProduct.imageUrl
+          }),
+        })
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        toast.error(errorData.error || 'Failed to update product')
+        return
+      }
+
+      toast.success('Product updated successfully! 🎉')
+      await fetchProducts()
+      setEditingProduct(null)
+      resetForm()
+      
+    } catch (error) {
+      console.error('Failed to update product:', error)
+      toast.error('Unable to update product. Please try again.')
+    }
+  }
+
+  const resetForm = () => {
+    setNewProduct({ name: '', description: '', price: '', category: '', imageUrl: '' })
+    setImageFile(null)
+    setImagePreview(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product)
+    setNewProduct({
+      name: product.name,
+      description: product.description || '',
+      price: product.price.toString(),
+      category: product.category || '',
+      imageUrl: product.imageUrl || ''
+    })
+    setImagePreview(product.imageUrl || null)
+    setShowAddForm(true)
   }
 
   const filteredProducts = products.filter(product => {
@@ -112,7 +241,11 @@ export default function Products() {
         </div>
         <div className="mt-4 sm:mt-0">
           <button
-            onClick={() => setShowAddForm(true)}
+            onClick={() => {
+              setEditingProduct(null)
+              resetForm()
+              setShowAddForm(true)
+            }}
             className="btn btn-primary"
           >
             <PlusIcon className="h-4 w-4 mr-2" />
@@ -154,15 +287,17 @@ export default function Products() {
         </div>
       </div>
 
-      {/* Add Product Form */}
+      {/* Add/Edit Product Form */}
       {showAddForm && (
         <div className="surface-elevated-high animate-scale-in">
           <div className="p-6 border-b border-gray-100">
-            <h2 className="text-headline">Add New Product</h2>
-            <p className="text-body mt-1">Create a new product for your catalog</p>
+            <h2 className="text-headline">{editingProduct ? 'Edit Product' : 'Add New Product'}</h2>
+            <p className="text-body mt-1">
+              {editingProduct ? 'Update product details' : 'Create a new product for your catalog'}
+            </p>
           </div>
           
-          <form onSubmit={handleAddProduct} className="p-6">
+          <form onSubmit={editingProduct ? handleUpdateProduct : handleAddProduct} className="p-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="form-label">Product Name</label>
@@ -198,14 +333,54 @@ export default function Products() {
                 />
               </div>
               <div>
-                <label className="form-label">Image URL</label>
-                <input
-                  type="url"
-                  className="form-input"
-                  placeholder="https://example.com/image.jpg"
-                  value={newProduct.imageUrl}
-                  onChange={(e) => setNewProduct({ ...newProduct, imageUrl: e.target.value })}
-                />
+                <label className="form-label">Image</label>
+                <div className="flex items-center space-x-4">
+                  <label className="btn btn-secondary flex-1 text-center">
+                    Choose File
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleFileChange}
+                    />
+                  </label>
+                  {(imageFile || newProduct.imageUrl || (editingProduct && editingProduct.imageUrl)) && (
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      onClick={() => {
+                        setImageFile(null)
+                        setImagePreview(null)
+                        setNewProduct({ ...newProduct, imageUrl: '' })
+                        if (fileInputRef.current) {
+                          fileInputRef.current.value = ''
+                        }
+                      }}
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+                {imageFile && (
+                  <p className="text-sm text-gray-500 mt-1 truncate">
+                    {imageFile.name} ({(imageFile.size / 1024).toFixed(1)} KB)
+                  </p>
+                )}
+                {!imageFile && (
+                  <>
+                    <div className="mt-2">
+                      <label className="form-label text-sm">Or enter image URL</label>
+                      <input
+                        type="url"
+                        className="form-input"
+                        placeholder="https://example.com/image.jpg"
+                        value={newProduct.imageUrl}
+                        onChange={(e) => setNewProduct({ ...newProduct, imageUrl: e.target.value })}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
               <div className="md:col-span-2">
                 <label className="form-label">Description</label>
@@ -218,10 +393,33 @@ export default function Products() {
                 />
               </div>
             </div>
+            
+            {/* Image Preview */}
+            {(imagePreview || newProduct.imageUrl || (editingProduct && editingProduct.imageUrl)) && (
+              <div className="mt-4">
+                <label className="form-label">Image Preview</label>
+                <div className="border rounded-lg p-2 bg-gray-50">
+                  <img
+                    src={imagePreview || newProduct.imageUrl || (editingProduct?.imageUrl || '')}
+                    alt="Preview"
+                    className="max-h-40 mx-auto"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iMzIiIHk9IjMyIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+            
             <div className="mt-6 flex justify-end space-x-3">
               <button
                 type="button"
-                onClick={() => setShowAddForm(false)}
+                onClick={() => {
+                  setShowAddForm(false)
+                  setEditingProduct(null)
+                  resetForm()
+                }}
                 className="btn btn-secondary"
               >
                 Cancel
@@ -230,7 +428,7 @@ export default function Products() {
                 type="submit"
                 className="btn btn-primary"
               >
-                Add Product
+                {editingProduct ? 'Update Product' : 'Add Product'}
               </button>
             </div>
           </form>
@@ -251,7 +449,11 @@ export default function Products() {
           </p>
           {!searchQuery && !categoryFilter && (
             <button
-              onClick={() => setShowAddForm(true)}
+              onClick={() => {
+                setEditingProduct(null)
+                resetForm()
+                setShowAddForm(true)
+              }}
               className="btn btn-primary"
             >
               Add Your First Product
@@ -274,7 +476,7 @@ export default function Products() {
                     alt={product.name}
                     onError={(e) => {
                       const target = e.target as HTMLImageElement
-                      target.style.display = 'none'
+                      target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjQiIGhlaWdodD0iNjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHJlY3Qgd2lkdGg9IjY0IiBoZWlnaHQ9IjY0IiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iMzIiIHk9IjMyIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTIiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiPk5vIEltYWdlPC90ZXh0Pjwvc3ZnPg=='
                     }}
                   />
                 </div>
@@ -315,7 +517,10 @@ export default function Products() {
                   </span>
                   
                   <div className="flex space-x-1">
-                    <button className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+                    <button 
+                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      onClick={() => handleEditProduct(product)}
+                    >
                       <PencilIcon className="h-4 w-4" />
                     </button>
                     <button className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
