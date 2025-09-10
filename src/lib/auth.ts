@@ -2,7 +2,6 @@ import { NextAuthOptions } from 'next-auth'
 import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import { prisma } from '@/lib/prisma'
-import bcrypt from 'bcryptjs'
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -21,6 +20,18 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
+        // For demo purposes, we'll check against hardcoded values
+        // This is a simplified approach for demonstration
+        const validCredentials = 
+          (credentials.email === 'admin@example.com' && credentials.password === 'TempPass123!') ||
+          (credentials.email === 'viewer@example.com' && credentials.password === 'TempPass123!')
+
+        if (!validCredentials) {
+          console.log('❌ Invalid credentials for:', credentials.email)
+          return null
+        }
+
+        // Find the user in the database
         const user = await prisma.user.findUnique({
           where: {
             email: credentials.email
@@ -32,19 +43,6 @@ export const authOptions: NextAuthOptions = {
 
         if (!user || !user.isActive) {
           console.log('❌ User not found or inactive')
-          return null
-        }
-
-        console.log('👤 Found user:', user.email, user.role)
-
-        // For demo purposes, we'll check against hardcoded passwords
-        // In production, you'd hash passwords and compare
-        const validPassword = 
-          (credentials.email === 'admin@example.com' && credentials.password === 'TempPass123!') ||
-          (credentials.email === 'viewer@example.com' && credentials.password === 'TempPass123!')
-
-        if (!validPassword) {
-          console.log('❌ Invalid password for:', credentials.email)
           return null
         }
 

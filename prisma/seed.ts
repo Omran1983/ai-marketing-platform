@@ -1,5 +1,4 @@
 import { PrismaClient, UserRole, CampaignStatus, CreativeType, CreativeStatus } from '@prisma/client'
-import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
